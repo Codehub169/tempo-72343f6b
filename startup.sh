@@ -24,6 +24,10 @@ fi
 # Note: Activation syntax can vary slightly between shells. This is common for bash/zsh.
 source venv/bin/activate
 
+# Upgrade pip
+echo "Upgrading pip..."
+python -m pip install --upgrade pip
+
 if [ ! -f "requirements.txt" ]; then
     echo "Error: 'backend/requirements.txt' not found."
     deactivate # Deactivate venv if requirements are missing and we exit
@@ -63,6 +67,9 @@ fi
 echo "Installing Node.js dependencies from package.json..."
 # This will create package-lock.json if it doesn't exist
 npm install
+
+echo "Addressing npm vulnerabilities..."
+npm audit fix
 
 echo "Building frontend application..."
 # This will create the 'dist' directory with static assets
