@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-brand-dark-bg text-brand-light-gray font-sans min-h-screen m-0 overflow-x-hidden flex flex-col items-center;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar styles using Tailwind theme colors */
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-brand-dark-bg; /* Uses #263238 */
+  }
+  ::-webkit-scrollbar-thumb {
+    /* Using button-secondary-bg (#546E7A) as per HTML preview style for scrollbar thumb */
+    @apply bg-button-secondary-bg rounded-[5px]; 
+    border: 2px solid theme('colors.brand-dark-bg');
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-brand-accent; /* Uses #FF9800 */
+  }
+}

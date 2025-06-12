@@ -1,0 +1,9 @@
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+SQLAlchemy>=2.0.0
+python-dotenv>=1.0.0
+pydantic[email]>=2.0.0
+# For serving static files and templates if needed, although FastAPI handles basic static files
+aiofiles>=23.1.0
+# Jinja2 can be useful if server-side templating beyond SPA index.html is ever needed
+# jinja2>=3.1.2 
