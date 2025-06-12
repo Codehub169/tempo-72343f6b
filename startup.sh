@@ -74,8 +74,10 @@ echo "Installing Node.js dependencies from package.json..."
 # This will create package-lock.json if it doesn't exist
 npm install
 
-echo "Addressing npm vulnerabilities (force fix as suggested by logs)..."
-npm audit fix --force
+echo "Addressing npm vulnerabilities..."
+# Changed from 'npm audit fix --force' to 'npm audit fix' to avoid forced breaking changes.
+# This will attempt to fix vulnerabilities without forcing major version upgrades unless necessary and un-forced.
+npm audit fix
 
 echo "Building frontend application..."
 # This will create the 'dist' directory with static assets
