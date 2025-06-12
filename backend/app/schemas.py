@@ -17,4 +17,4 @@ class Score(ScoreBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True # Enables Pydantic to work with ORM models
+        from_attributes = True # Enables Pydantic to work with ORM models
