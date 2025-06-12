@@ -96,6 +96,10 @@ fi
 # This is a safeguard in case the shell environment from the first activation was lost or if running parts of the script in subshells.
 source venv/bin/activate
 
+# Ensure Python output is unbuffered, which helps with logging in Docker
+export PYTHONUNBUFFERED=1
+
+echo "Attempting to start Uvicorn server..."
 # Use exec to replace the shell process with the uvicorn process.
 # This makes uvicorn the main process in the container (if this script is PID 1)
 # and ensures signals are handled correctly.
