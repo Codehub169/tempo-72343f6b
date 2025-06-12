@@ -68,7 +68,7 @@ if [ ! -f "package.json" ]; then
 fi
 
 echo "Updating npm to a recent stable version..."
-npm install -g npm@10.8.2 # Updating to the version mentioned prior to the major bump, or use specific version like npm@11.4.1 if compatibility is confirmed
+npm install -g npm@11.4.1 # Updating to the version mentioned in logs
 
 echo "Installing Node.js dependencies from package.json..."
 # This will create package-lock.json if it doesn't exist
@@ -77,6 +77,7 @@ npm install
 echo "Addressing npm vulnerabilities..."
 # Changed from 'npm audit fix --force' to 'npm audit fix' to avoid forced breaking changes.
 # This will attempt to fix vulnerabilities without forcing major version upgrades unless necessary and un-forced.
+# If vulnerabilities persist after dependency updates (e.g., in package.json), this might still report them.
 npm audit fix
 
 echo "Building frontend application..."
