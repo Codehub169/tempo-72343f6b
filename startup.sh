@@ -26,9 +26,6 @@ source venv/bin/activate
 
 if [ ! -f "requirements.txt" ]; then
     echo "Error: 'backend/requirements.txt' not found."
-    # Deactivate venv if created in this script run before exiting
-    # Check if we are in a virtual environment (optional, as script exit might handle it)
-    # if [ -n "$VIRTUAL_ENV" ]; then deactivate; fi 
     exit 1
 fi
 echo "Installing Python dependencies from requirements.txt..."
@@ -84,11 +81,13 @@ if [ ! -f "app/main.py" ]; then
     echo "Error: 'backend/app/main.py' not found. Cannot start Uvicorn server."
     exit 1
 fi
-uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT
 
-# Deactivate virtual environment on exit (optional, as script exit usually handles this)
-# The script might be terminated before this line if uvicorn is ^C'd
-# Consider a trap for cleanup if strict deactivation is needed.
-# if [ -n "$VIRTUAL_ENV" ]; then deactivate; fi 
+# Use exec to replace the shell process with the uvicorn process.
+# This makes uvicorn the main process in the container (if this script is PID 1)
+# and ensures signals are handled correctly.
+exec uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT
 
-echo -e "\n\ud83d\udc4b Application stopped."
+# Lines below this 'exec' will not be reached as the script process is replaced.
+# This is the intended behavior for running a long-lived service like uvicorn as the main container process.
+
+# echo -e "\n\ud83d\udc4b Application stopped."
