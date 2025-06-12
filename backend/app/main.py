@@ -4,6 +4,10 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
+from .database import create_db_and_tables # For DB initialization
+from . import models # Ensures models are registered with SQLAlchemy's Base for table creation
+from .routers import scores # Import the scores router
+
 # Create FastAPI app instance
 app = FastAPI(
     title="Pythonic Snake Game API",
@@ -12,20 +16,18 @@ app = FastAPI(
 )
 
 # --- CORS Middleware --- 
-# Allows requests from specified origins. For development, allowing all is common.
-# For production, restrict this to your frontend's domain.
+# Added to allow frontend (e.g., Vite dev server on a different port) to communicate with the API.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins for simplicity
+    allow_origins=["*"],  # Allows all origins for simplicity in dev (adjust for production)
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], # Specify methods or use ["*"]
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
-# --- API Routers (Placeholder) --- 
-# Example: 
-# from .routers import scores  # Assuming you'll have a scores.py router
-# app.include_router(scores.router, prefix="/api/v1/scores", tags=["scores"])
+# --- API Routers --- 
+# Corrected prefix to /api/scores to match frontend expectations
+app.include_router(scores.router, prefix="/api/scores", tags=["Scores"])
 
 @app.get("/api/health", tags=["General"])
 async def health_check():
@@ -33,16 +35,14 @@ async def health_check():
     return {"status": "ok", "message": "API is healthy"}
 
 # --- Frontend Serving --- 
-# Determine the absolute path to the frontend's build directory.
-# Assumes this 'main.py' is in 'backend/app/', and 'frontend/dist' is at the project root level.
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 FRONTEND_BUILD_DIR = os.path.join(PROJECT_ROOT, "frontend", "dist")
 
-# Check if the frontend build directory exists
+# Check if frontend build exists
 if not os.path.exists(FRONTEND_BUILD_DIR):
     print(f"WARNING: Frontend build directory not found at {FRONTEND_BUILD_DIR}")
     print("Please build the frontend using 'npm run build' in the 'frontend' directory.")
-    # Optionally, serve a placeholder message if the frontend is not built
+    # Provide a placeholder page if frontend is not built
     @app.get("/{catchall:path}", response_class=HTMLResponse)
     async def serve_placeholder_frontend(request: Request):
         return """
@@ -56,58 +56,53 @@ if not os.path.exists(FRONTEND_BUILD_DIR):
         </html>
         """
 else:
-    # Mount static files (JS, CSS, images, etc.) from the frontend build directory's 'assets' folder
-    # Vite typically places assets in an 'assets' subfolder within 'dist'.
+    # Mount the 'assets' directory from the frontend build (common for Vite/React apps)
     assets_dir = os.path.join(FRONTEND_BUILD_DIR, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
     else:
-        print(f"WARNING: Frontend assets directory not found at {assets_dir}")
+        print(f"WARNING: Frontend assets directory not found at {assets_dir}. Static assets might not load correctly.")
 
-    # Serve other static files like favicon.ico, manifest.json etc., directly from the root of dist
-    # These are files that might not be in the 'assets' folder.
-    app.mount("/static-root", StaticFiles(directory=FRONTEND_BUILD_DIR, html=False), name="static-root-files")
+    # Removed redundant /static-root mount as per CONF_UNC_001
 
-    @app.get("/{catchall:path}", response_class=FileResponse)
+    # Catch-all route to serve index.html or other static files from the root of the build directory
+    @app.get("/{catchall:path}") # response_class removed from decorator as function can return FileResponse or HTMLResponse
     async def serve_react_app(request: Request, catchall: str):
-        """
-        Serve the main index.html for all non-API routes.
-        This allows React Router to handle client-side navigation.
-        """
         index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
-        # Fallback for paths that look like files but are not found, to prevent serving index.html for them
-        # e.g. /nonexistent.js should be 404, not index.html
+        # Construct path to the requested file within the frontend build directory
+        # e.g., if catchall is 'favicon.ico', path is 'frontend/dist/favicon.ico'
+        # e.g., if catchall is 'manifest.json', path is 'frontend/dist/manifest.json'
+        # If catchall is empty (root path), potential_file_path will be FRONTEND_BUILD_DIR itself.
         potential_file_path = os.path.join(FRONTEND_BUILD_DIR, catchall)
-        if os.path.isfile(potential_file_path):
-             if os.path.exists(potential_file_path):
-                return FileResponse(potential_file_path)
-             else:
-                return FileResponse(index_path, status_code=404) # Or a custom 404 page
 
+        # Serve the file if it exists (e.g., favicon.ico, manifest.json, etc.)
+        # os.path.isfile also checks for existence implicitly.
+        if os.path.isfile(potential_file_path):
+            return FileResponse(potential_file_path)
+
+        # For any other path (SPA routes like /game, /scoreboard, or non-existent assets not caught by /assets mount),
+        # serve the main index.html file, allowing the frontend router to handle the path.
         if os.path.exists(index_path):
             return FileResponse(index_path)
         
-        # If index.html itself is not found (which would be unusual after a successful build)
+        # Fallback if index.html itself is not found (indicates a broken build or misconfiguration)
         return HTMLResponse(
             content="<html><head><title>Error</title></head><body><h1>Frontend Error</h1><p>index.html not found. Please rebuild the frontend.</p></body></html>",
             status_code=500
         )
 
-# --- Database Initialization (Placeholder) ---
-# from .database import engine, Base
-# from . import models # Ensure models are imported so SQLAlchemy knows about them
+# --- Database Initialization ---
+@app.on_event("startup")
+def on_startup(): # Can be a synchronous function if create_db_and_tables is sync
+    # Ensure models are imported before create_db_and_tables if it relies on Base.metadata
+    # The 'from . import models' at the top of the file handles this.
+    print("Application startup: Initializing database...")
+    create_db_and_tables() # Call the function from database.py to create tables
+    print("Database tables checked/created.")
 
-# @app.on_event("startup")
-# async def on_startup():
-#     # This is where you would create database tables if they don't exist
-#     # For a simple project, you might do it directly.
-#     # For more complex setups, Alembic migrations are recommended.
-#     async with engine.begin() as conn:
-#         # await conn.run_sync(Base.metadata.drop_all) # Use with caution: drops all tables
-#         await conn.run_sync(Base.metadata.create_all)
-#     print("Database tables checked/created.")
-
-# To run directly (for development, though uvicorn command is preferred for startup.sh):
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=9000, reload=True)
+# To run directly (for development, though uvicorn command in startup.sh is preferred for deployment-like start):
+if __name__ == "__main__":
+    import uvicorn
+    # Default port changed to 8000 to avoid conflict with Vite's default (e.g. 5173 or 9000 if configured)
+    # and to match frontend proxy target if frontend dev server is used.
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

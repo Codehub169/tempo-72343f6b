@@ -1,28 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-
-// Placeholder for API service
-const api = {
-  getScores: async (limit = 10) => {
-    console.log('Fetching scores...'); // Log for now
-    // Simulate API call with richer data based on HTML preview
-    return new Promise(resolve => setTimeout(() => {
-      resolve([
-        { id: 1, player_name: 'SerpentSage', score: 15200, created_at: new Date().toISOString() },
-        { id: 2, player_name: 'PixelPilot', score: 13800, created_at: new Date().toISOString() },
-        { id: 3, player_name: 'GliderPro', score: 12500, created_at: new Date().toISOString() },
-        { id: 4, player_name: 'CodeCobra', score: 11200, created_at: new Date().toISOString() },
-        { id: 5, player_name: 'ByteBoa', score: 10850, created_at: new Date().toISOString() },
-        { id: 6, player_name: 'ReactRattler', score: 9900, created_at: new Date().toISOString() },
-        { id: 7, player_name: 'Anonymous', score: 9500, created_at: new Date().toISOString() },
-        { id: 8, player_name: 'JS_Jouster', score: 8700, created_at: new Date().toISOString() },
-        { id: 9, player_name: 'LoopLegend', score: 8150, created_at: new Date().toISOString() },
-        { id: 10, player_name: 'FastAPI_Fan', score: 7800, created_at: new Date().toISOString() },
-      ]);
-    }, 500));
-    // Replace with actual API call: e.g., return axios.get(`/api/scores?limit=${limit}`);
-  }
-};
+// Import the actual API service function for fetching scores
+import { getScores as apiGetScores } from '../services/api';
 
 const ScoreboardPage = () => {
   const [scores, setScores] = useState([]);
@@ -33,19 +12,20 @@ const ScoreboardPage = () => {
     const fetchScores = async () => {
       try {
         setLoading(true);
-        const fetchedScores = await api.getScores(12); // Fetch top 12 scores
+        // Use the imported API function to fetch scores
+        const fetchedScores = await apiGetScores(); // Default limit is 10 by API if not specified
         setScores(fetchedScores);
         setError(null);
       } catch (err) {
         console.error('Failed to fetch scores:', err);
-        setError('Failed to load scores. Please try again later.');
-        setScores([]);
+        setError(err.message || 'Failed to load scores. Please try again later.');
+        setScores([]); // Clear scores on error
       } finally {
         setLoading(false);
       }
     };
     fetchScores();
-  }, []);
+  }, []); // Empty dependency array means this runs once on mount
 
   const getRankBadgeClass = (rank) => {
     if (rank === 1) return 'rank-1 bg-medal-gold text-brand-dark-bg';
@@ -68,7 +48,7 @@ const ScoreboardPage = () => {
       </header>
 
       {loading && <p className="text-brand-light-gray text-xl">Loading scores...</p>}
-      {error && <p className="text-brand-error text-xl">{error}</p>}
+      {error && <p className="text-brand-error text-xl">Error: {error}</p>}
       
       {!loading && !error && (
         <div className="scoreboard-container bg-brand-even-darker-gray rounded-xl shadow-retro-lg overflow-hidden w-full">

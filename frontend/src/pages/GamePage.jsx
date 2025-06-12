@@ -1,18 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import GameBoard from '../components/GameBoard';
 import GameOverModal from '../components/GameOverModal';
-// Placeholder for API service
-const api = {
-  submitScore: async (scoreData) => {
-    console.log('Submitting score:', scoreData); // Log for now
-    // Simulate API call
-    return new Promise(resolve => setTimeout(() => {
-      resolve({ message: 'Score submitted successfully!' });
-    }, 500));
-    // Replace with actual API call: e.g., return axios.post('/api/scores', scoreData);
-  }
-};
+// Import the actual API service function for submitting scores
+import { submitScore as apiSubmitScore } from '../services/api';
 
 const GRID_SIZE = 20;
 const INITIAL_SNAKE = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
@@ -29,16 +20,28 @@ const GamePage = () => {
   const [gameOver, setGameOver] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const navigate = useNavigate();
 
-  const getRandomPosition = () => ({
-    x: Math.floor(Math.random() * GRID_SIZE),
-    y: Math.floor(Math.random() * GRID_SIZE),
-  });
+  const getRandomPosition = useCallback(() => {
+    let newFoodPosition;
+    do {
+      newFoodPosition = {
+        x: Math.floor(Math.random() * GRID_SIZE),
+        y: Math.floor(Math.random() * GRID_SIZE),
+      };
+    } while (snake.some(segment => segment.x === newFoodPosition.x && segment.y === newFoodPosition.y));
+    return newFoodPosition;
+  }, [snake]);
 
   const resetGame = useCallback(() => {
     setSnake(INITIAL_SNAKE);
-    setFood(getRandomPosition());
+    let initialFoodPosition;
+    do {
+      initialFoodPosition = {
+        x: Math.floor(Math.random() * GRID_SIZE),
+        y: Math.floor(Math.random() * GRID_SIZE),
+      };
+    } while (INITIAL_SNAKE.some(segment => segment.x === initialFoodPosition.x && segment.y === initialFoodPosition.y));
+    setFood(initialFoodPosition);
     setDirection(INITIAL_DIRECTION);
     setScore(0);
     setGameActive(false);
@@ -47,30 +50,26 @@ const GamePage = () => {
   }, []);
 
   useEffect(() => {
-    resetGame(); // Initialize game state on mount
+    resetGame();
   }, [resetGame]);
 
-  // Game Loop
   useEffect(() => {
     if (!gameActive || gamePaused || gameOver) return;
-
     const gameInterval = setInterval(() => {
       setSnake(prevSnake => {
         const newSnake = [...prevSnake];
-        const head = { ...newSnake[0] }; // New head
-
+        const head = { ...newSnake[0] };
         head.x += direction.x;
         head.y += direction.y;
 
-        // Wall collision
+        // Boundary collision
         if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
           setGameOver(true);
           setGameActive(false);
           return prevSnake;
         }
-
-        // Self collision
-        for (let i = 1; i < newSnake.length; i++) {
+        // Self-collision
+        for (let i = 0; i < newSnake.length; i++) {
           if (newSnake[i].x === head.x && newSnake[i].y === head.y) {
             setGameOver(true);
             setGameActive(false);
@@ -78,37 +77,51 @@ const GamePage = () => {
           }
         }
 
-        newSnake.unshift(head); // Add new head
+        newSnake.unshift(head);
 
         // Food consumption
         if (head.x === food.x && head.y === food.y) {
           setScore(s => s + 10);
           setFood(getRandomPosition());
-          // Snake grows, so don't pop tail
         } else {
-          newSnake.pop(); // Remove tail
+          newSnake.pop();
         }
         return newSnake;
       });
     }, GAME_SPEED_MS);
-
     return () => clearInterval(gameInterval);
-  }, [gameActive, gamePaused, gameOver, direction, food]);
+  }, [gameActive, gamePaused, gameOver, direction, food, getRandomPosition]);
 
-  // Keyboard Controls
+  const startGame = useCallback(() => {
+    resetGame();
+    setGameActive(true);
+    setGamePaused(false);
+    setGameOver(false);
+  }, [resetGame]);
+
+  const togglePause = useCallback(() => {
+    if (gameActive && !gameOver) {
+      setGamePaused(prev => !prev);
+    }
+  }, [gameActive, gameOver]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (gameOver) return;
+      // Allow Enter/Space for modal actions if needed, but not game control if game is over.
+      if (gameOver && e.key !== 'Enter' && e.key !== ' ') return;
+      
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
-        if (!gameActive && !gameOver) {
+        if (gameOver) return; // Modal handles Enter/Space when game is over.
+        if (!gameActive) {
           startGame();
-        } else if (gameActive) {
+        } else {
           togglePause();
         }
         return;
       }
-      if (!gameActive || gamePaused) return;
+
+      if (!gameActive || gamePaused || gameOver) return;
 
       switch (e.key) {
         case 'ArrowUp':    if (direction.y === 0) setDirection({ x: 0, y: -1 }); break;
@@ -118,38 +131,33 @@ const GamePage = () => {
         default: break;
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameActive, gamePaused, gameOver, direction]);
-
-  const startGame = () => {
-    resetGame();
-    setGameActive(true);
-    setGamePaused(false);
-    setGameOver(false);
-  };
-
-  const togglePause = () => {
-    if (gameActive) {
-      setGamePaused(prev => !prev);
-    }
-  };
+  }, [gameActive, gamePaused, gameOver, direction, startGame, togglePause]);
 
   const handleScoreSubmit = async (playerName) => {
+    if (!playerName || playerName.trim() === '') {
+        setToastMessage('Player name cannot be empty.');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        return; 
+    }
     try {
-      await api.submitScore({ player_name: playerName, score });
-      setToastMessage(`Score for ${playerName} (${score}) submitted!`);
+      const submittedScoreData = { player_name: playerName, score: score };
+      const response = await apiSubmitScore(submittedScoreData);
+      setToastMessage(`Score for ${response.player_name} (${response.score}) submitted!`);
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+      // Optionally navigate to scoreboard after submission, e.g.:
+      // navigate('/scoreboard');
     } catch (error) {
       console.error('Failed to submit score:', error);
-      setToastMessage('Failed to submit score. Please try again.');
+      setToastMessage(error.message || 'Failed to submit score. Please try again.');
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+    } finally {
+      setTimeout(() => setShowToast(false), 3000); 
+      setGameOver(false); 
+      resetGame(); 
     }
-    setGameOver(false); // Close modal
-    resetGame();
   };
 
   return (
@@ -166,13 +174,14 @@ const GamePage = () => {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-brand-accent" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M5 2a1 1 0 00-1 1v1H3a1 1 0 00-1 1v12a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1h-1V3a1 1 0 00-1-1H5zm10 4H5V8h10V6zM5 10h10v6H5v-6z" clipRule="evenodd" />
             </svg>
-            <p className="text-xl text-brand-light-gray">Score: <span className="font-bold text-3xl text-score-text-color score-text transition-transform duration-150 transform scale-100 group-hover:scale-110">{score}</span></p>
+            <p className="text-xl text-brand-light-gray">Score: <span className="font-bold text-3xl text-score-text-color score-text transition-transform duration-150 transform scale-100 hover:scale-110">{score}</span></p>
           </div>
           <button 
-            onClick={!gameActive ? startGame : togglePause}
-            className={`btn ${!gameActive || gamePaused ? 'btn-primary bg-brand-accent text-brand-dark-bg hover:bg-orange-600' : 'btn-warning bg-button-warning-bg text-brand-dark-bg hover:bg-button-warning-hover'}`}
+            onClick={gameOver ? () => {} : (!gameActive ? startGame : togglePause)}
+            disabled={gameOver}
+            className={`btn ${gameOver ? 'btn-disabled bg-slate-500 cursor-not-allowed' : (!gameActive || gamePaused ? 'btn-primary bg-brand-accent text-brand-dark-bg hover:bg-orange-600' : 'btn-warning bg-button-warning-bg text-brand-dark-bg hover:bg-button-warning-hover')}`}
           >
-            {!gameActive ? 'Start Game' : gamePaused ? 'Resume Game' : 'Pause Game'}
+            {gameOver ? 'Game Over' : (!gameActive ? 'Start Game' : gamePaused ? 'Resume Game' : 'Pause Game')}
           </button>
         </div>
 
@@ -189,7 +198,6 @@ const GamePage = () => {
         
         <div className="text-sm text-slate-400 mt-3">
           <p>Use Arrow Keys to move. Space/Enter to Start/Pause.</p>
-          <p className="md:hidden">On mobile: Swipe to control (swipe controls TBD)</p>
         </div>
 
         <div className="mt-8 flex justify-center">
@@ -206,7 +214,6 @@ const GamePage = () => {
         onPlayAgain={startGame} 
       />
       
-      {/* Toast Notification for score submission */}
       {showToast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-snake-green text-white px-6 py-3 rounded-md shadow-lg z-[100] transition-opacity duration-300">
           {toastMessage}
