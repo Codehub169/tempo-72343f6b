@@ -84,21 +84,23 @@ echo "Starting FastAPI server on http://0.0.0.0:$APP_PORT"
 # Ensure app.main:app exists and is executable by uvicorn.
 if [ ! -f "app/main.py" ]; then
     echo "Error: 'backend/app/main.py' not found. Cannot start Uvicorn server."
+    # If the virtual environment was activated (likely from the first backend setup block),
+    # attempt to deactivate it before exiting. This is mainly for cleanup if run in an interactive shell.
+    if command -v deactivate &> /dev/null; then
+        deactivate
+    fi
     exit 1
 fi
 
 # Activate virtual environment again before exec, ensuring uvicorn runs in the correct environment.
-# This is crucial if the earlier 'source' was in a subshell or its effect doesn't persist to 'exec'.
-# However, if 'cd backend' and 'source' were in the main shell process, it should persist.
-# Using the explicit path to venv uvicorn is more robust.
+# This is a safeguard in case the shell environment from the first activation was lost or if running parts of the script in subshells.
 source venv/bin/activate
 
 # Use exec to replace the shell process with the uvicorn process.
 # This makes uvicorn the main process in the container (if this script is PID 1)
 # and ensures signals are handled correctly.
-# Using explicit path to venv uvicorn and adding --log-level debug for better diagnostics.
-# The path ./venv/bin/uvicorn assumes we are in the 'backend' directory.
-exec ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT --log-level debug
+# Using the venv's python to run uvicorn module for potentially better robustness.
+exec ./venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port "$APP_PORT" --log-level debug
 
 # Lines below this 'exec' will not be reached as the script process is replaced.
 # This is the intended behavior for running a long-lived service like uvicorn as the main container process.
