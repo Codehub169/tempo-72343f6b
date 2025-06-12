@@ -67,8 +67,12 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-echo "Updating npm to a recent stable version..."
-npm install -g npm@11.4.1 # Updating to the version mentioned in logs
+# echo "Updating npm to a recent stable version..."
+# npm install -g npm@11.4.1 # Updating to the version mentioned in logs - This line caused the EBADENGINE error.
+# The existing npm version (e.g., 10.8.2 with Node 18.20.8) should be sufficient.
+# If a specific npm version compatible with Node 18 is needed, it should be specified here, e.g. npm install -g npm@10
+echo "Using existing npm version. Verifying npm version..."
+npm -v
 
 echo "Installing Node.js dependencies from package.json..."
 # This will create package-lock.json if it doesn't exist
