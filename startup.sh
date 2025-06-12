@@ -30,7 +30,9 @@ python -m pip install --upgrade pip
 
 if [ ! -f "requirements.txt" ]; then
     echo "Error: 'backend/requirements.txt' not found."
-    deactivate # Deactivate venv if requirements are missing and we exit
+    if command -v deactivate &> /dev/null; then # Check if deactivate command exists
+        deactivate # Deactivate venv if requirements are missing and we exit
+    fi
     exit 1
 fi
 echo "Installing Python dependencies from requirements.txt..."
@@ -64,12 +66,16 @@ if [ ! -f "package.json" ]; then
     echo "Error: 'frontend/package.json' not found."
     exit 1
 fi
+
+echo "Updating npm to a recent stable version..."
+npm install -g npm@10.8.2 # Updating to the version mentioned prior to the major bump, or use specific version like npm@11.4.1 if compatibility is confirmed
+
 echo "Installing Node.js dependencies from package.json..."
 # This will create package-lock.json if it doesn't exist
 npm install
 
-echo "Addressing npm vulnerabilities..."
-npm audit fix
+echo "Addressing npm vulnerabilities (force fix as suggested by logs)..."
+npm audit fix --force
 
 echo "Building frontend application..."
 # This will create the 'dist' directory with static assets
